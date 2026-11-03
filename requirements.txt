@@ -1,0 +1,8 @@
+# Third-party dependencies for Polar_Plotting_GLOE_with_optional_manual_masks.py
+# GLOEseq_Sam_full.py uses only Python standard-library modules.
+# Version ranges are compatibility targets derived from imports, not a locked environment.
+numpy>=1.24,<3
+pandas>=2.0,<3
+matplotlib>=3.7,<4
+openpyxl>=3.1,<4  # Optional: reading .xlsx input
+xlrd>=2.0,<3     # Optional: reading .xls input

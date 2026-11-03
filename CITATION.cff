@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+message: "If you use SamCutFinder, please cite the software and the corresponding research article when available."
+type: software
+title: "SamCutFinder: GLOE-seq plasmid cleavage-site analysis and circular visualization"
+authors:
+  - family-names: Senoussi
+    given-names: Issam
+repository-code: "https://github.com/Sam18-hub/SamCutFinder"
+url: "https://github.com/Sam18-hub/SamCutFinder"
+license: MIT
+# When creating your journal-associated release, add the exact version and
+# its Zenodo version DOI, for example:
+# version: "1.0.0"
+# doi: "10.5281/zenodo.XXXXXXX"
