@@ -1,4 +1,5 @@
 import os
+import argparse
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -42,13 +43,60 @@ RADIAL_MAX = None
 # BOTTOM_POSITIONS_TO_HIDE_1BASED = [137, 171, 172, 173, 174, 999]
 #
 # Leave a list empty if you do not want to hide anything on that strand.
-TOP_POSITIONS_TO_HIDE_1BASED = [272, 337, 808, 1111, 2304, 2705, 2727, 2808, 3216, 3227]
+TOP_POSITIONS_TO_HIDE_1BASED = []
 BOTTOM_POSITIONS_TO_HIDE_1BASED = []
 
 
 # Image resolution.
 DPI = 600
 
+
+# =============================================================================
+# COMMAND-LINE OPTIONS (no code edits needed for a new sample)
+# =============================================================================
+
+def parse_cli():
+    parser = argparse.ArgumentParser(
+        description="Plot strand-specific GLOE-seq cleavage signals on a circular plasmid."
+    )
+    parser.add_argument(
+        "input_file", nargs="?", default=INPUT_FILE,
+        help="Path to raw_nick_position_plot_ready.csv (or compatible table)."
+    )
+    parser.add_argument(
+        "--raw", action="store_true",
+        help="Plot raw reads rather than BPM-normalized signals."
+    )
+    parser.add_argument(
+        "--radial-max", type=float, default=RADIAL_MAX,
+        help="Fix the radial scale for comparisons (default: automatic)."
+    )
+    parser.add_argument(
+        "--output-prefix", default=os.path.splitext(OUTPUT_PNG)[0],
+        help="Base path for both PNG and PDF output (default: gloe_polar_plot)."
+    )
+    parser.add_argument(
+        "--hide-top", type=int, nargs="*", default=None, metavar="POS",
+        help="Explicitly hide selected 1-based top-strand positions for display only."
+    )
+    parser.add_argument(
+        "--hide-bottom", type=int, nargs="*", default=None, metavar="POS",
+        help="Explicitly hide selected 1-based bottom-strand positions for display only."
+    )
+    return parser.parse_args()
+
+
+args = parse_cli()
+INPUT_FILE = args.input_file
+OUTPUT_PNG = args.output_prefix + ".png"
+OUTPUT_PDF = args.output_prefix + ".pdf"
+if args.raw:
+    USE_BPM = False
+RADIAL_MAX = args.radial_max
+if args.hide_top is not None:
+    TOP_POSITIONS_TO_HIDE_1BASED = args.hide_top
+if args.hide_bottom is not None:
+    BOTTOM_POSITIONS_TO_HIDE_1BASED = args.hide_bottom
 
 # =============================================================================
 # LOAD DATA
@@ -232,6 +280,8 @@ plt.savefig(OUTPUT_PNG, dpi=DPI, bbox_inches="tight", pad_inches=0)
 plt.savefig(OUTPUT_PDF, bbox_inches="tight", pad_inches=0)
 
 print(f"Input: {INPUT_FILE}")
+print(f"Display-only masks (TOP): {TOP_POSITIONS_TO_HIDE_1BASED}")
+print(f"Display-only masks (BOTTOM): {BOTTOM_POSITIONS_TO_HIDE_1BASED}")
 print(f"Top column: {top_col}")
 print(f"Bottom column: {bottom_col}")
 print(f"Positions: {N}")
