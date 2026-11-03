@@ -4,24 +4,24 @@
 
 SamCutFinder consists of two Python scripts for analysing plasmid-based GLOE-seq data and visualizing the positions of captured DNA 3′-OH ends on circular DNA substrates. The first script assigns reads to strand-specific plasmid coordinates and produces per-position count tables. The second creates polar plots showing the distribution of those counts on both strands.
 
-> **Scope:** This is a research script collection, not a general-purpose sequencing aligner or a validated end-to-end software package. The current analysis script contains a specific pair of plasmid reference sequences and sample-specific FASTQ paths. Users must configure these for their experiments and validate the mapping/strand conventions before drawing biological conclusions.
+> **Scope:** This is a research script collection, not a general-purpose sequencing aligner or a validated end-to-end software package. The analysis script contains a specific pair of plasmid reference sequences. Users must verify or replace these sequences for their experiments and validate the mapping/strand conventions before drawing biological conclusions.
 
 ## Repository contents
 
 | File | Purpose |
 | --- | --- |
 | `GLOEseq_Sam_full.py` | Read mapping, strand assignment, cleavage-position counting, QC summaries, and CSV export. |
-| `Polar_Plotting_GLOE_with_optional_manual_masks.py` | Circular plotting of the strand-resolved count tables. |
+| `Polar_Plotting_GLOE_with_optional_manual_masks(1).py` | Circular plotting of the strand-resolved count tables. |
 | `requirements.txt` | Third-party packages needed by the plotting script. |
 | `CITATION.cff` | Machine-readable instructions for citing the software on GitHub. |
 | `LICENSE` | MIT license. |
 
 ## How the analysis works
 
-1. Reads are loaded from **gzipped FASTQ** (`.fq.gz` or `.fastq.gz`) files. The analysis script currently uses the read sequence, not its per-base quality scores.
+1. Reads are loaded from **gzipped FASTQ** (`.fq.gz` or `.fastq.gz`) files. The analysis uses read sequences but not per-base quality scores; FASTQ record structure and sequence/quality lengths are checked.
 2. The first **75 nt** of each read, starting at `READ_START_OFFSET = 0`, are compared against both user-specified circular plasmid strand references. Exact matches are attempted first.
 3. When `ALLOW_ONE_MISMATCH = True`, alignments with one mismatch in the 75-nt anchor can be rescued using candidate 25-nt seeds. With `REQUIRE_UNIQUE_ALIGNMENT = True`, ambiguous best alignments are excluded.
-4. The reference strands are aligned to each other using their complementary sequence, allowing the output to put opposite-strand cleavage counts in a common physical coordinate system even when one strand contains an extrahelical loop. Unpaired positions are explicitly flagged.
+4. The two reference strands are aligned using their complementary sequences so that strand-specific counts share a physical coordinate system. Fully complementary circular plasmids without an extrahelical loop are supported. Where extrahelical positions occur on the top reference strand, they are flagged explicitly.
 5. Under the **direct-mode GLOE-seq convention implemented by the script**, a read aligned to the bottom reference is assigned to a 3′-OH on the top strand, and vice versa. The reported cleavage position is the **nucleotide carrying the original 3′-OH**, rather than the following phosphodiester bond.
 6. The script reports read counts at each position and **BPM (break reads per million uniquely mapped, coordinate-assigned reads)**:
 
@@ -57,23 +57,33 @@ On Windows, activate the environment with `.venv\\Scripts\\activate` and use `py
 
 ## Part 1 — Configure and run the FASTQ analysis
 
-### A. Specify the input FASTQ files
+### A. Select the input FASTQ files (no Mac-specific code paths)
 
-Open `GLOEseq_Sam_full.py` in a text editor. Find the `browse()` function near the beginning of the file. **It currently contains eight absolute paths under `/Users/sam/...`**, which will not exist on another computer. Replace its return value with paths to your own gzipped FASTQ files, for example:
+The updated analysis script accepts a directory containing gzipped FASTQ files, or explicit file paths. It does **not** require editing the `browse()` function.
 
-```python
-def browse():
-    return [
-        "/path/to/sample_01.fq.gz",
-        "/path/to/sample_02.fq.gz",
-    ]
+Process every `.fq.gz` or `.fastq.gz` file directly inside a folder (not recursively):
+
+```bash
+python GLOEseq_Sam_full.py --input-dir "/path/to/your/FASTQ_folder"
 ```
 
-You can enter one sample or several. The paths must refer to existing files.
+Alternatively, process one file:
+
+```bash
+python GLOEseq_Sam_full.py "/path/to/sample_01.fq.gz"
+```
+
+Or multiple named files:
+
+```bash
+python GLOEseq_Sam_full.py "/path/to/sample_01.fq.gz" "/path/to/sample_02.fq.gz"
+```
+
+For a short test run of 10,000 reads per sample, add `--max-reads 10000`. The default (`--max-reads 0`) processes all reads. Use `python GLOEseq_Sam_full.py --help` for the full command-line help.
 
 ### B. Set the correct plasmid references
 
-The `top_strand` and `bottom_strand` variables are **embedded directly in the script**. The current references have 3,248 and 3,245 nucleotides, respectively, and the code reports three unpaired top-strand positions for that substrate. **These are not universal GLOE-seq references.** Replace both sequences with the correct strand sequences for each substrate and check that their relative orientation, loop position, and nucleotide numbering match your experiment.
+The `top_strand` and `bottom_strand` variables are **embedded directly in the script**. The current references have 3,248 and 3,245 nucleotides, respectively, and the code reports three unpaired top-strand positions for that substrate. **These are example-specific GLOE-seq reference sequences, not a required plasmid architecture.** Replace both sequences with the correct strand sequences for each substrate and check their 5′→3′ orientation and nucleotide numbering. A plasmid with no extrahelical loop can be analysed with fully complementary references. For substrates with extrahelical positions, ensure the strand-pairing map corresponds to the DNA construct.
 
 The program prints a reference/duplex check and rejects unmapped bottom bases or non-complementary paired positions. This automated check should **not** substitute for an independent validation of the actual plasmid sequence and strand assignment.
 
@@ -90,25 +100,17 @@ REQUIRE_UNIQUE_ALIGNMENT = True
 BPM_SCALE = 1_000_000.0
 ```
 
-The FASTQ reads must contain the relevant plasmid-derived sequence at the expected offset. This script does not automatically trim adapters, remove UMIs, or filter by sequencing quality. If an experiment uses a different read layout or capture protocol, validate and adapt these settings and the cleavage-coordinate convention.
+The FASTQ reads must contain the relevant plasmid-derived sequence at the expected offset. This script does not automatically trim adapters, remove UMIs, or filter by sequencing quality. It rejects malformed FASTQ records rather than silently processing partial inputs. If an experiment uses a different read layout or capture protocol, validate and adapt these settings and the cleavage-coordinate convention.
 
 ### D. Run the script
 
-From the repository folder:
+Open Terminal in the repository folder and execute the command in Part A, substituting your actual FASTQ folder/path. For example:
 
 ```bash
-python GLOEseq_Sam_full.py
+python GLOEseq_Sam_full.py --input-dir "/Users/yourname/Documents/GLOEseq_FASTQ"
 ```
 
-The script asks:
-
-```text
-How many reads[0]?
-```
-
-Type **`0` and press Return** to process all reads. To test on a subset, type a positive integer such as `10000`. **Do not simply press Return**: in the current version, a blank answer raises a `ValueError`.
-
-For each input FASTQ, the script creates an output folder **next to that FASTQ file**, with a sample-derived name and random numeric suffix. It also writes a combined mapping summary CSV in the directory containing the first processed sample.
+The updated version no longer prompts for a read count. All reads are processed by default. For each FASTQ, the script creates an output folder **next to the FASTQ**, with a sample-derived name and random numeric suffix. A combined mapping summary CSV is also written in the directory containing the first processed sample.
 
 ### E. Analysis output files
 
@@ -127,44 +129,27 @@ For each input FASTQ, the script creates an output folder **next to that FASTQ f
 
 ## Part 2 — Generate a circular cleavage-site plot
 
-1. Find the sample's `raw_nick_position_plot_ready.csv` from Part 1.
-2. Open `Polar_Plotting_GLOE_with_optional_manual_masks.py` in a text editor.
-3. Edit `INPUT_FILE` to point to that CSV. Use an absolute path if it is outside the repository folder:
-
-   ```python
-   INPUT_FILE = "/path/to/sample_output/raw_nick_position_plot_ready.csv"
-   ```
-
-4. Choose the quantity to plot:
-
-   ```python
-   USE_BPM = True  # False = raw read counts; True = BPM
-   ```
-
-5. **Important: review the position masks before generating scientific figures.** The uploaded plotting script currently contains a list of **10 top-strand positions to hide**. These signals are set to zero **in the plotted arrays only**, while the original CSV is unchanged. For an unmasked figure, replace both lists with:
-
-   ```python
-   TOP_POSITIONS_TO_HIDE_1BASED = []
-   BOTTOM_POSITIONS_TO_HIDE_1BASED = []
-   ```
-
-   If you deliberately hide any positions in a publication figure, disclose the exact exclusion criteria, affected positions, and rationale, and preserve an unmasked visualization for transparency.
-
-6. Optional graphical settings:
-
-   ```python
-   BAR_WIDTH_MULTIPLIER = 3  # visual width; >1 overlaps neighbouring angular bins
-   RADIAL_MAX = None          # auto scaling; set a shared value across samples for comparisons
-   DPI = 600
-   ```
-
-7. Run:
+1. Locate `raw_nick_position_plot_ready.csv` from the corresponding sample's analysis output folder.
+2. From the repository folder, run this command (replace the path with your actual CSV):
 
    ```bash
-   python Polar_Plotting_GLOE_with_optional_manual_masks.py
+   python "Polar_Plotting_GLOE_with_optional_manual_masks(1).py" "/path/to/raw_nick_position_plot_ready.csv"
    ```
 
-By default, the script saves `gloe_polar_plot.png` and `gloe_polar_plot.pdf` in the **current working directory**, and opens a Matplotlib plot window if a graphical display is available.
+3. By default the script plots **BPM**, and generates **`gloe_polar_plot.png`** and **`gloe_polar_plot.pdf`** in the current working directory.
+4. To plot raw read counts rather than BPM, add `--raw`.
+5. For the same radial scale in compared plots, add `--radial-max 1000` (replace 1000 with an appropriate fixed value). To choose an output filename, use `--output-prefix "/path/to/sample1_circle"`. If `--radial-max` is less than the largest peak, bars exceeding that fixed value are clipped in the image (with a warning); the input data remain unchanged.
+
+**No cleavage positions are hidden by default** in this updated script:
+
+```python
+TOP_POSITIONS_TO_HIDE_1BASED = []
+BOTTOM_POSITIONS_TO_HIDE_1BASED = []
+```
+
+Optional display-only masking can be requested explicitly using `--hide-top 272 337` or `--hide-bottom 137 171`, but **do not use masked representations as an undisclosed depiction of the complete cleavage profile**. The input CSV is not altered. If masking is ever scientifically justified, document the positions, rationale, and unmasked result.
+
+**Visual resolution:** `BAR_WIDTH_MULTIPLIER = 3` in the original plot style makes bars three times the angular spacing of adjacent positions; it may visually merge adjacent peaks. Set this constant to `1` when an exact one-position-wide representation is required. Maintain the same scale and graphical parameters across compared samples.
 
 ### Reading the circular plot
 
@@ -185,7 +170,7 @@ The plotting script also accepts compatible CSV/TSV/TXT and Excel (`.xlsx`/`.xls
 - The analysis does not use read-quality scores, deduplicate PCR molecules/UMIs, or estimate absolute cleavage efficiency.
 - The reference-duplex correspondence is inferred using sequence matching; inspect the coordinate map carefully for alternative plasmids or more complex loop/indel architectures.
 - Entire FASTQ read sequences and per-read output records are retained in memory, which can be demanding for very large libraries.
-- The plotting masks are **visualization-only** and must not be confused with exclusions applied during read mapping or quantification.
+- Optional plotting masks are **visualization-only** and must not be confused with exclusions applied during read mapping or quantification.
 
 ## Reproducibility and citation
 
