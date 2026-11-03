@@ -1,4 +1,5 @@
 import os
+import argparse
 import sys
 import gzip
 import random
@@ -29,17 +30,43 @@ def import_reads(file_name, number_of_reads):
         print(f"An error occurred: {e}")
     return reads
 
-def browse():
-    """Returns the file names to be processed."""
-    return ["/Users/sam/Documents/Experiments/Experiments/python files/FastQ datas/GLOEseq08_09_26/202609041656_AE01-250401014_4P260523176US293232S2_B_runG58_17_GLOESEQ_L00.fq.gz",
-            "/Users/sam/Documents/Experiments/Experiments/python files/FastQ datas/GLOEseq08_09_26/202609041656_AE01-250401014_4P260523176US293232S2_B_runG58_19_GLOESEQ_L00.fq.gz",
-            "/Users/sam/Documents/Experiments/Experiments/python files/FastQ datas/GLOEseq08_09_26/202609041656_AE01-250401014_4P260523176US293232S2_B_runG58_15_GLOESEQ_L00.fq.gz",
-            "/Users/sam/Documents/Experiments/Experiments/python files/FastQ datas/GLOEseq08_09_26/202609041656_AE01-250401014_4P260523176US293232S2_B_runG58_16_GLOESEQ_L00.fq.gz",
-            "/Users/sam/Documents/Experiments/Experiments/python files/FastQ datas/GLOEseq08_09_26/202609041656_AE01-250401014_4P260523176US293232S2_B_runG58_2_GLOESEQ_L00.fq.gz",
-            "/Users/sam/Documents/Experiments/Experiments/python files/FastQ datas/GLOEseq08_09_26/202609041656_AE01-250401014_4P260523176US293232S2_B_runG58_3_GLOESEQ_L00.fq.gz",
-            "/Users/sam/Documents/Experiments/Experiments/python files/FastQ datas/GLOEseq08_09_26/202609041656_AE01-250401014_4P260523176US293232S2_B_runG58_4_GLOESEQ_L00.fq.gz",
-            "/Users/sam/Documents/Experiments/Experiments/python files/FastQ datas/GLOEseq08_09_26/202609041656_AE01-250401014_4P260523176US293232S2_B_runG58_6_GLOESEQ_L00.fq.gz",
-            ]
+def browse(input_paths=None, input_dir=None):
+    """Collect FASTQ files from explicit paths and/or a directory (non-recursive)."""
+    file_names = list(input_paths or [])
+    if input_dir is not None:
+        if not os.path.isdir(input_dir):
+            raise FileNotFoundError(f"FASTQ directory not found: {input_dir}")
+        file_names.extend(
+            os.path.join(input_dir, name)
+            for name in sorted(os.listdir(input_dir))
+            if name.lower().endswith((".fq.gz", ".fastq.gz"))
+        )
+    return list(dict.fromkeys(os.path.abspath(path) for path in file_names))
+
+
+def parse_cli():
+    parser = argparse.ArgumentParser(
+        description="Map GLOE-seq gzipped FASTQ reads to the embedded circular plasmid references."
+    )
+    parser.add_argument(
+        "fastq", nargs="*", metavar="sample.fq.gz",
+        help="One or more gzipped FASTQ files (can be used with --input-dir)."
+    )
+    parser.add_argument(
+        "--input-dir", metavar="DIRECTORY",
+        help="Process all .fq.gz/.fastq.gz files directly inside this directory."
+    )
+    parser.add_argument(
+        "--max-reads", type=int, default=0, metavar="N",
+        help="Maximum reads per file; 0 (default) processes all reads."
+    )
+    args = parser.parse_args()
+    if not args.fastq and not args.input_dir:
+        parser.error("Provide one or more FASTQ files or --input-dir DIRECTORY.")
+    if args.max_reads < 0:
+        parser.error("--max-reads must be zero or a positive integer.")
+    return args
+
 
 ### Reference Sequences Input
 
@@ -825,14 +852,15 @@ def write_outputs(
 # =============================================================================
 
 def main():
+    args = parse_cli()
     unpaired_top_positions = validate_strand_map()
 
-    file_names = browse()
+    file_names = browse(args.fastq, args.input_dir)
 
     if not file_names:
-        raise SystemExit("No FASTQ files are listed in browse().")
+        raise SystemExit("No .fq.gz or .fastq.gz files were found. Check --input-dir.")
 
-    number_of_reads = int(input("How many reads[0]? "))
+    number_of_reads = args.max_reads
 
     combined_summary = []
 
